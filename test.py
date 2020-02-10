@@ -13,6 +13,7 @@ NETPARAMS = 'netparams.dat'
 #   1. testing triangles has aspect ratios that are not in the training data
 #   2. testing triangles has triangle size that are not in the training data
 #   (we include a failure case in the data: the ear of the horse.obj)
+
 def main():
     numSubd = 2
 
