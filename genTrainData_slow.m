@@ -26,7 +26,7 @@ Vin = normalizeUnitBox(Vin);
 % create subdivision meshes
 for ii = 1:numData
     nVc = nV_average + round(nV_variance * (rand() - 0.5));
-    [V,F,decInfo] = SSP_decimation(Vin,Fin,nVc,'QEM', 0.1,0.4,true);
+    [V,F,decInfo] = SSP_decimation(Vin,Fin,nVc, 'QEM', 0.1,0.4,true);
     [VList,FList] = SSP_upsample(V,F,numSubd,Vin,Fin,decInfo);
 
     % save data

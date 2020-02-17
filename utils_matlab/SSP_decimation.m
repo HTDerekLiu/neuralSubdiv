@@ -1,12 +1,12 @@
 function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
     method, triQ_threshold, dotn_threshold, randomEC)
 
-    % TODO: check tettrahedron
-    % TODO: check injectivity??? is face clip enough? 
+    % TODO: check tetrahedron
+    % TODO: extend to mesh with boundaries
 
     % parse parameters 
     if(~exist('method','var'))
-        method = 'QEM'; % this could be 'QEM', 'WQEM', 'midPoint'
+        method = 'QEM'; % this could be 'QEM', 'midPoint'
     end
     if(~exist('triQ_threshold','var'))
         triQ_threshold = 0.2;
@@ -273,11 +273,12 @@ function KV = vertexCost(V,F, method)
     switch method 
         case {'QEM', 'WQEM'}
             FN = faceNormals(V,F);
+            FA = doublearea(V,F) / 2;
             KF = zeros(4,4,size(F,1));
             for ii = 1:size(F,1)
                 d = - FN(ii,:) * V(F(ii,1),:)';
                 p = [FN(ii,:), d]';
-                KF(:,:,ii) = p * p';
+                KF(:,:,ii) = FA(ii) * (p * p');
             end
             adjFList = vertexFaceAdjacencyList(F);
             KV = zeros(4,4,size(V,1));
@@ -297,7 +298,7 @@ end
 %%
 function ECost = edgeCost(V,E,K_v,method)
     switch method
-        case {'QEM', 'WQEM'}
+        case {'QEM'}
             ECost = zeros(size(E,1),1);
             for e = 1:size(E,1)
                 % K_e = K_v1 + K_v2
@@ -318,10 +319,6 @@ function ECost = edgeCost(V,E,K_v,method)
                     ECost(e) = inf; % set inf or nan to inf
                 end
             end
-            if strcmp(method, 'WQEM')
-                ELen = sqrt(sum((V(E(:,1),:) - V(E(:,2),:)).^2,2));
-                ECost = ECost .* (ELen.^2);
-            end
         case 'midPoint'
             ECost = sqrt(sum((V(E(:,1),:) - V(E(:,2),:)).^2,2));
     end
@@ -330,7 +327,7 @@ end
 %%
 function [p, cost] = optPos(Ke, vi, vj, method)
     switch method 
-        case {'QEM', 'WQEM'}
+        case {'QEM'}
             % v'Kv = v'Av + 2b'v + c 
             A = Ke(1:3, 1:3);
             b = Ke(1:3, 4);
@@ -356,7 +353,7 @@ end
 function [ECost, K] = updateEdgeCost(V,E,vi,vj,K,ECost, method)
 
         switch method
-            case {'QEM', 'WQEM'}
+            case {'QEM'}
                 K(:,:,vi) = K(:,:,vi) + K(:,:,vj);
                 [adjE, ~] = find(E == vi);
                 for ii = 1:length(adjE)
@@ -364,10 +361,6 @@ function [ECost, K] = updateEdgeCost(V,E,vi,vj,K,ECost, method)
                     Ke = K(:,:,E(eIdx,1)) + K(:,:,E(eIdx,2)); 
                     [~, cost] = optPos(Ke, V(E(eIdx,1),:), V(E(eIdx,2),:), method);
                     ECost(eIdx) = cost;
-                    if strcmp(method, 'WQEM')
-                        eLen = sqrt(sum((V(E(eIdx,1),:) - V(E(eIdx,2),:)).^2));
-                        ECost(eIdx) = eLen^2 * ECost(eIdx);
-                    end
                     if isnan(ECost(eIdx)) || isinf(ECost(eIdx))
                         ECost(eIdx) = inf; % set inf or nan to inf
                     end
