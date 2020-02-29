@@ -28,12 +28,14 @@ def main():
     meshPath = [sys.argv[2]]
     T = TestCategories(meshPath, numSubd)
     T.computeParameters()
+    if not torch.cuda.is_available():
+        params['device'] = 'cpu'
     T.toDevice(params["device"])
 
     # initialize network 
     net = SubdNet(params)
     net = net.to(params['device'])
-    net.load_state_dict(torch.load(params['output_path'] + NETPARAMS))
+    net.load_state_dict(torch.load(params['output_path'] + NETPARAMS, map_location=torch.device(params["device"])))
     net.eval()
 
     # write output shapes (test set)
