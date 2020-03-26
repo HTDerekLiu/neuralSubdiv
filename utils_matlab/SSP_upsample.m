@@ -1,4 +1,6 @@
 function [VList,FList] = SSP_upsample(Vb,Fb,numSubd,Vin,Fin,decInfo)
+    % Upsample the mesh and use the successive self-parameterization (Section 4) to map upsampled vertices to the orignal mesh
+
     VList = {};
     FList = {};
     
@@ -21,6 +23,7 @@ function [VList,FList] = SSP_upsample(Vb,Fb,numSubd,Vin,Fin,decInfo)
     % compute subdivided meshes
     visitedV = [];
     for sIdx = 1:numSubd
+        % get barycentric coordinates (bC) and face information (bF) of the subdivided mesh
         [V,F,S] = midPointUpsample(Vb,Fb,sIdx);
         [vList,bC,bF] = barycentricFromS(Fb,S);
         
@@ -31,12 +34,13 @@ function [VList,FList] = SSP_upsample(Vb,Fb,numSubd,Vin,Fin,decInfo)
             vList(vList <= maxIdx) = [];
         end
 
+        % perform successive mapping from coarse to fine (Fig.13)
         tmpV = zeros(size(bC,1), 3);
         parfor ii = 1:size(bC,1)
             if mod(ii, 100) == 0
                 fprintf('QEM_up: %d/%d\n', [ii,size(bC,1)]);
             end
-            [b, vIdx] = map_coarseToFine(bC(ii,:), bF(ii,:), decInfo);
+            [b, vIdx] = map_coarseToFine(bC(ii,:), bF(ii,:), decInfo); 
             tmpV(ii,:) = b * Vin(vIdx,:);
         end
         V(vList,:) = tmpV;
@@ -49,6 +53,7 @@ function [VList,FList] = SSP_upsample(Vb,Fb,numSubd,Vin,Fin,decInfo)
 end
 
 function [vList,bC,bF] = barycentricFromS(F,S)
+    % get barycentric coordinates from the subdivision operator (S)
     vList = unique(F);
     vList = [vList', 1+size(S,2):size(S,1)]';
     bC = zeros(length(vList), 3);
@@ -80,6 +85,7 @@ function [vList,bC,bF] = barycentricFromS(F,S)
         [~, iaInv] = sort(ia);
         adjVInFinf = ib(iaInv);
 
+        % get barycentric coordinates (bC) and face information (bF)
         bF(ii,:) = F(f,:);
         bC(ii,adjVInFinf) = b;
     end

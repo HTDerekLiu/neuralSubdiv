@@ -26,54 +26,99 @@ import json
 import pickle as pickle
 
 
-class Mesh:
+class Mesh: 
+    # store information of a mesh
     def __init__(self, V, F, hfList):
-        # V: vertex list
-        # F: face list
-        # hfList: half flap list: 
-        #   [[vi, vj, flap0, flap1, v_next],
-        #   [vj, vi, flap1, flap0, v_next], ....]
+        """
+        Inputs:
+            V: nV-3 vertex list
+            F: nF-3 face list
+            hfList: nHF-5 ordered vertex index of all half flaps 
+            
+            Notes: 
+            each half flap order looks like (see paper for the color scheme)
+            [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+        """
         self.V = V
         self.F = F
         self.hfList = hfList
 
 
-class Category:
-    def __init__(self, folder):
-        self.meshes = processTrainShapes(folder)
-        self.nM = len(self.meshes)
-        self.nS = len(self.meshes[0])
+def processTrainShapes(folder):
+    """
+    process training shapes given a folder, including computing the half flap list and read the vertex/face lists
+    """
+    # detect number of subd and number of meshes per subd
+    subFolders = os.listdir(folder)
+    subFolders = [x for x in subFolders if not (x.startswith('.'))]
+    nSubd = len(subFolders) - 1
 
+    objPaths = glob.glob(folder + subFolders[0] + "/*.obj")
+    nObjs = len(objPaths)
 
-class Categories:
+    # create data loading list of strings (glod results are not sorted)
+    paths = []
+    for ii in range(nSubd + 1):
+        paths.append(folder + 'subd' + str(ii) + '/')
+
+    objFiles = []
+    for ii in range(nObjs):
+        objFiles.append(str(ii + 1).zfill(3))
+
+    # load data
+    meshes = [None] * nObjs
+    for ii in range(nObjs):
+        print('process meshes %d / %d' % (ii, nObjs))
+        meshes_i = [None] * (nSubd + 1)
+        for jj in range(nSubd + 1):
+            V, F = tgp.readOBJ(paths[jj] + objFiles[ii] + '.obj')
+            _, hfList = computeFlapList(V, F, 1)
+            meshes_i[jj] = Mesh(V, F, hfList[0])
+        meshes[ii] = list(meshes_i)
+    print('num Subd: %d, num meshes: %d' % (nSubd, nObjs))
+    return meshes
+
+class TrainMeshes: 
+    """
+    store information of many training meshes (see gendataPKL.py for usage)
+    """
     def __init__(self, folders):
+        """
+        Inputs:
+            folders: list of folders that contain the meshes
+        """
         nShape = len(folders)
         self.meshes = []
         for fIdx in range(nShape):
-            folder = folders[fIdx]
-            S = Category(folder)
-            for ii in range(S.nM):
-                self.meshes.append(S.meshes[ii])
+            meshes = processTrainShapes(folders[fIdx])
+            for ii in range(len(meshes)):
+                self.meshes.append(meshes[ii])
         self.nM = len(self.meshes)  # number of meshes
         self.nS = len(self.meshes[0])  # number of subdivision levels
 
-        # parameters
+        # initialize parameters required during training
         self.hfList = None  # half flap index information
         self.poolMats = None  # vertex one-ring pooling matrices
         self.dofs = None  # vertex degrees of freedom
         self.LCs = None  # vector of differential coordinates
 
-    def getTrainData(self, mIdx, params):
+    def getInputData(self, mIdx):
+        """
+        get input data for the network
+        Inputs: 
+            mIdx: mesh index
+        """
         input = torch.cat((
-            self.meshes[mIdx][0].V,
-            self.LCs[mIdx]),
+            self.meshes[mIdx][0].V, # vertex positions
+            self.LCs[mIdx]), # vector of differential coordinates
             dim=1)
-        return input  # (nV x Din)
+        return input 
 
     def getHalfFlap(self):
-        # create a list of tuples
-        # HF[meshIdx][subdIdx] = [vi[0], vj[0], flap0, flap1,]
-        # HF[meshIdx][subdIdx] = [vj[0], vi[0], flap1, flap0,]
+        """
+        create a list of half flap information, such that (see paper for the color scheme)
+        HF[meshIdx][subdIdx] = [v_blue, v_red, v_purple, v_yellow]
+        """
         HF = [None] * self.nM
         for ii in range(self.nM):
             fifj = [None] * (self.nS - 1)
@@ -84,8 +129,13 @@ class Categories:
         return HF
 
     def getFlapPool(self, HF):
-        nM = len(HF)
-        nS = len(HF[0])
+        """
+        get the matrix for vertex one-ring average pooling (left two sub-figures in Fig.17)
+        Inputs:
+            HF: half flap list (see self.getHalfFlap())
+        """
+        nM = len(HF) # number of meshes
+        nS = len(HF[0]) # number of subdivision levels
 
         poolFlap = [None] * nM
         dof = [None] * nM
@@ -106,11 +156,18 @@ class Categories:
 
                 poolFlap_ij[jj] = poolMat
                 dof_ij[jj] = rowSum
-            poolFlap[ii] = list(poolFlap_ij)
-            dof[ii] = list(dof_ij)
+            poolFlap[ii] = list(poolFlap_ij) # one-ring pooling matrix
+            dof[ii] = list(dof_ij) # degrees of freedom per vertex
         return poolFlap, dof
 
     def getLaplaceCoordinate(self, hfList, poolMats, dofs):
+        """
+        get the vectors of the differential coordinates (see Fig.18)
+        Inputs:
+            hfList: half flap list (see self.getHalfFlap)
+            poolMats: vertex one-ring pooling matrix (see self.getFlapPool)
+            dofs: degrees of freedom per vertex (see self.getFlapPool)
+        """
         LC = [None] * self.nM
         for mIdx in range(self.nM):
             V = self.meshes[mIdx][0].V
@@ -124,11 +181,20 @@ class Categories:
         return LC
 
     def computeParameters(self):
+        """
+        pre-compute parameters required for network training. It includes:
+        hfList: list of half flaps
+        poolMats: vertex one-ring pooling 
+        LCs: vector of differential coordinates
+        """
         self.hfList = self.getHalfFlap()
         self.poolMats, self.dofs = self.getFlapPool(self.hfList)
         self.LCs = self.getLaplaceCoordinate(self.hfList, self.poolMats, self.dofs)
 
     def toDevice(self, device):
+        """
+        move information to CPU/GPU
+        """
         for ii in range(self.nM):
             for jj in range(self.nS):
                 self.meshes[ii][jj].V = self.meshes[ii][jj].V.to(device)
@@ -140,9 +206,34 @@ class Categories:
                 self.poolMats[ii][jj] = self.poolMats[ii][jj].to(device)
                 self.dofs[ii][jj] = self.dofs[ii][jj].to(device)
 
+def preprocessTestShapes(meshPathList, nSubd=2):
+    """
+    process testing shapes given a list of .obj paths, including normalizing the shape and computing the half flap list
+    """
+    nObjs = len(meshPathList)
+    meshes = [None] * nObjs
+    for meshIdx in range(nObjs):
+        path = meshPathList[meshIdx]
+        V, F = tgp.readOBJ(path)
+        V = tgp.normalizeUnitCube(V) * 2
+        FList, hfList = computeFlapList(V, F, nSubd)
 
-class TestCategories:
+        meshes_i = [None] * (nSubd + 1)
+        for jj in range(nSubd + 1):
+            if jj == 0:
+                meshes_i[jj] = Mesh(V, FList[jj], hfList[jj])
+            else:
+                meshes_i[jj] = Mesh(None, FList[jj], hfList[jj])
+        meshes[meshIdx] = list(meshes_i)
+    print('num Subd: %d, num meshes: %d' % (nSubd, nObjs))
+    return meshes
+
+class TestMeshes:
     def __init__(self, meshPathList, nSubd=2):
+        """
+        Inputs:
+            meshPathList: list of pathes to .obj files
+        """
         nShape = len(meshPathList)
         self.meshes = preprocessTestShapes(meshPathList, nSubd)
         self.nM = len(self.meshes)  # number of meshes
@@ -154,7 +245,12 @@ class TestCategories:
         self.dofs = None  # vertex degrees of freedom
         self.LCs = None  # vector of differential coordinates
 
-    def getTrainData(self, mIdx, params):
+    def getInputData(self, mIdx):
+        """
+        get input data for the network
+        Inputs: 
+            mIdx: mesh index
+        """
         input = torch.cat((
             self.meshes[mIdx][0].V,
             self.LCs[mIdx]),
@@ -162,9 +258,10 @@ class TestCategories:
         return input  # (nV x Din)
 
     def getHalfFlap(self):
-        # create a list of tuples
-        # HF[meshIdx][subdIdx] = [vi[0], vj[0], flap0, flap1,]
-        # HF[meshIdx][subdIdx] = [vj[0], vi[0], flap1, flap0,]
+        """
+        create a list of half flap information, such that (see paper for the color scheme)
+        HF[meshIdx][subdIdx] = [v_blue, v_red, v_purple, v_yellow]
+        """
         HF = [None] * self.nM
         for ii in range(self.nM):
             fifj = [None] * (self.nS - 1)
@@ -175,6 +272,11 @@ class TestCategories:
         return HF
 
     def getFlapPool(self, HF):
+        """
+        get the matrix for vertex one-ring average pooling (left two sub-figures in Fig.17)
+        Inputs:
+            HF: half flap list (see self.getHalfFlap())
+        """
         nM = len(HF)
         nS = len(HF[0])
 
@@ -202,6 +304,13 @@ class TestCategories:
         return poolFlap, dof
 
     def getLaplaceCoordinate(self, hfList, poolMats, dofs):
+        """
+        get the vectors of the differential coordinates (see Fig.18)
+        Inputs:
+            hfList: half flap list (see self.getHalfFlap)
+            poolMats: vertex one-ring pooling matrix (see self.getFlapPool)
+            dofs: degrees of freedom per vertex (see self.getFlapPool)
+        """
         LC = [None] * self.nM
         for mIdx in range(self.nM):
             V = self.meshes[mIdx][0].V
@@ -215,11 +324,20 @@ class TestCategories:
         return LC
 
     def computeParameters(self):
+        """
+        pre-compute parameters required for network training. It includes:
+        hfList: list of half flaps
+        poolMats: vertex one-ring pooling 
+        LCs: vector of differential coordinates
+        """
         self.hfList = self.getHalfFlap()
         self.poolMats, self.dofs = self.getFlapPool(self.hfList)
         self.LCs = self.getLaplaceCoordinate(self.hfList, self.poolMats, self.dofs)
 
     def toDevice(self, device):
+        """
+        move information to CPU/GPU
+        """
         for ii in range(self.nM):
             for jj in range(self.nS):
                 if jj == 0:
@@ -234,18 +352,28 @@ class TestCategories:
 
 
 def computeFlapList(V, F, numSubd=2):
+    """
+    Compute lists of vertex indices for half flaps and for all subsequent subdivision levels. Each half flap has vertices ordered like:
+    [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+
+    Inputs:
+        V: nV-3 vertex list
+        F: nF-3 face list
+        numSubd: number of subdivisions
+    """
     FList = []
     halfFlapList = []
 
     for iter in range(numSubd):
-        # compute the subdivision indices
+        # compute the subdivided vertex and face lists
         nV = V.size(0)
         VV, FF, S = tgp_midPointUp(V, F, 1)
         rIdx = S._indices()[0, :]
         cIdx = S._indices()[1, :]
         val = S._values()
 
-        # only extract new vertices
+        # only extract new vertices 
+        # Note: I order the vertex list as V = [oldV, newV]
         cIdx = cIdx[rIdx >= nV]
         val = val[rIdx >= nV]
         rIdx = rIdx[rIdx >= nV]
@@ -253,7 +381,7 @@ def computeFlapList(V, F, numSubd=2):
 
         rIdx, idx = torch.sort(rIdx + nV)
         cIdx = cIdx[idx]
-        rIdx = rIdx[::2]  # same as MATLAB rIdx = rIdx[1:2:end]
+        rIdx = rIdx[::2]  
         cIdx = cIdx.view(-1, 2)
         # Note: Vodd = (V[cIdx[:,0],:] + V[cIdx[:,1],:]) / 2.0
 
@@ -287,13 +415,23 @@ def computeFlapList(V, F, numSubd=2):
             assert (f_first[1] == vj)
             assert (f_sec[2] == vj)
 
-            # assemble flapIdx = [vi vj flap1, flap2, v]
+            # assemble flapIdx as
+            # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
             flapIdx[kk, :] = torch.tensor([vi, vj, f_first[2], f_sec[1], rIdx[kk]])
 
-        # compute half flap list
+        # turn flap indices into half flap indices
         # note:
-        # halfFlapIdx = [[vi, vj, vk, vl, idxInVV]
-        #                [vj, vi, vl, vk, idxInVV]]
+        # flapIdx =
+        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+        #    |
+        #    V
+        # halfFlapIdx = 
+        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+        # [v_red, v_blue, v_yellow, v_purple, v_blue_at_next_level]
+        #    |
+        #    V
+        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level] (different orientation)
         halfFlapIdx = flapIdx[:, [0, 1, 2, 3, 4, 1, 0, 3, 2, 4]]
         halfFlapIdx = halfFlapIdx.reshape(-1, 5)
 
@@ -309,6 +447,9 @@ def computeFlapList(V, F, numSubd=2):
 
 
 def tgp_midPointUp(V, F, subdIter=1):
+    """
+    perform mid point upsampling
+    """
     Vnp = V.data.numpy()
     Fnp = F.data.numpy()
     VVnp, FFnp, SSnp = midPointUpsampling(Vnp, Fnp, subdIter)
@@ -324,40 +465,10 @@ def tgp_midPointUp(V, F, subdIter=1):
     SS = torch.sparse.FloatTensor(i, v, torch.Size(shape))
     return VV, FF, SS
 
-
-def processTrainShapes(folder):
-    # detect number of subd and number of meshes per subd
-    subFolders = os.listdir(folder)
-    subFolders = [x for x in subFolders if not (x.startswith('.'))]
-    nSubd = len(subFolders) - 1
-
-    objPaths = glob.glob(folder + subFolders[0] + "/*.obj")
-    nObjs = len(objPaths)
-
-    # create data loading list of strings (glod results are not sorted)
-    paths = []
-    for ii in range(nSubd + 1):
-        paths.append(folder + 'subd' + str(ii) + '/')
-
-    objFiles = []
-    for ii in range(nObjs):
-        objFiles.append(str(ii + 1).zfill(3))
-
-    # load data
-    meshes = [None] * nObjs
-    for ii in range(nObjs):
-        print('process meshes %d / %d' % (ii, nObjs))
-        meshes_i = [None] * (nSubd + 1)
-        for jj in range(nSubd + 1):
-            V, F = tgp.readOBJ(paths[jj] + objFiles[ii] + '.obj')
-            _, hfList = computeFlapList(V, F, 1)
-            meshes_i[jj] = Mesh(V, F, hfList[0])
-        meshes[ii] = list(meshes_i)
-    print('num Subd: %d, num meshes: %d' % (nSubd, nObjs))
-    return meshes
-
-
 def random3DRotation():
+    """
+    generate a random 3D rotation matrix just for testing 
+    """
     theta_x = torch.rand(1) * 2 * np.pi
     sinx = torch.sin(theta_x)
     cosx = torch.cos(theta_x)
@@ -380,22 +491,3 @@ def random3DRotation():
                        [0., 0., 1.]])
     return Rx.mm(Ry).mm(Rz)
 
-
-def preprocessTestShapes(meshPathList, nSubd=2):
-    nObjs = len(meshPathList)
-    meshes = [None] * nObjs
-    for meshIdx in range(nObjs):
-        path = meshPathList[meshIdx]
-        V, F = tgp.readOBJ(path)
-        V = tgp.normalizeUnitCube(V) * 2
-        FList, hfList = computeFlapList(V, F, nSubd)
-
-        meshes_i = [None] * (nSubd + 1)
-        for jj in range(nSubd + 1):
-            if jj == 0:
-                meshes_i[jj] = Mesh(V, FList[jj], hfList[jj])
-            else:
-                meshes_i[jj] = Mesh(None, FList[jj], hfList[jj])
-        meshes[meshIdx] = list(meshes_i)
-    print('num Subd: %d, num meshes: %d' % (nSubd, nObjs))
-    return meshes

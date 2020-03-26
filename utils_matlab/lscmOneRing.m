@@ -1,5 +1,5 @@
 function [UV,FUV,subsetVIdx,subsetFIdx,b,bc] = lscmOneRing(V,F,e)
-% LSCMONRING use LSCM "Spectral Conformal Parameterization" [Mullen et al. 2008]
+% LSCMONRING use LSCM "Spectral Conformal Parameterization" [Mullen et al. 2008] but we only perform the minimization of the conformal energy (instead of eigen solve)
 % to flatten the one ring patch of an edge e
 % 
 % Inputs:
@@ -36,7 +36,7 @@ viL = find(subsetVIdx == vi);
 vjL = find(subsetVIdx == vj);
 
 b = [viL, vjL];
-bc = [0,0; lij, 0];
+bc = [0,0; 5*lij, 0];
 UV = lscm(VL,FUV,b,bc);
 subsetFIdx = adjF;
 

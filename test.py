@@ -26,7 +26,7 @@ def main():
 
     # load validation set
     meshPath = [sys.argv[2]]
-    T = TestCategories(meshPath, numSubd)
+    T = TestMeshes(meshPath, numSubd)
     T.computeParameters()
     if not torch.cuda.is_available():
         params['device'] = 'cpu'
@@ -42,14 +42,14 @@ def main():
     mIdx = 0
     scale = 1.0 # may need to adjust the scale of the mesh since the network is not scale invariant
     meshName = os.path.basename(sys.argv[2])[:-4] # meshName: "bunny"
-    x = T.getTrainData(mIdx, params)
+    x = T.getInputData(mIdx)
     outputs = net(x, mIdx,T.hfList,T.poolMats,T.dofs) 
     for ii in range(len(outputs)):
         x = outputs[ii].cpu() * scale
         tgp.writeOBJ(params['output_path'] + meshName + '_subd' + str(ii) + '.obj',x, T.meshes[mIdx][ii].F.to('cpu'))
 
     # write rotated output shapes
-    x = T.getTrainData(mIdx, params)
+    x = T.getInputData(mIdx)
 
     dV = torch.rand(1, 3).to(params['device'])
     R = random3DRotation().to(params['device'])

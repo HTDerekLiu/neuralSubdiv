@@ -1,8 +1,8 @@
 function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
     method, triQ_threshold, dotn_threshold, randomEC)
 
-    % TODO: check tetrahedron
     % TODO: extend to mesh with boundaries
+    % Decimate the mesh with successive self-parameterization (Section 4)
 
     % parse parameters 
     if(~exist('method','var'))
@@ -72,13 +72,13 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
         Vpre = V;
         Fpre = F;
 
-        % compute parameterization
+        % compute parameterization (Fig.12 left column)
         [UV_pre,FUV_pre,subsetVIdx,subsetFIdx,b,bc] = lscmOneRing(V,F,E(e,:));
         UV = UV_pre;
         FUV = FUV_pre;
         assert(subsetVIdx(b(1)) == E(e,1)) % make sure b(1) corresponds to vi
 
-        % CHECK: check lscm self folding (before collapse)
+        % CHECK: check lscm self folding (before collapse) (Appendix C)
         angAll = internalangles(UV_pre,FUV_pre);
         idx1 = find(FUV_pre == b(1));
         ang1 = sum(angAll(idx1));
@@ -98,7 +98,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
         [adjFj,~] = find(F == vj);
         adjF = unique([adjFi; adjFj]);
         
-        % CHECK: check link condition
+        % CHECK: check link condition (Appendix C)
         Nvi = unique(F(adjFi,:));
         Nvj = unique(F(adjFj,:));
         if length(intersect(Nvi, Nvj)) ~= 4 % 4 includes vi, vj
@@ -130,7 +130,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
         [optvi, ~] = optPos(K(:,:,vi) + K(:,:,vj),V(vi,:),V(vj,:), method); 
         V(vi,:) = optvi;
 
-        % move vertex i in the UV domain
+        % move vertex i in the UV domain (Fig.12 right column)
         subsetFIdx(subsetFIdx == delF(1)) = [];
         subsetFIdx(subsetFIdx == delF(2)) = [];
         lb = subsetVIdx;
@@ -154,7 +154,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
         FN_new = cross(V(F(adjF,1),:)-V(F(adjF,2),:), V(F(adjF,1),:) - V(F(adjF,3),:));
         FN_new = normalizerow(FN_new);
         
-        % CHECK: triangle quality
+        % CHECK: triangle quality (Appendix C)
         l0 = sqrt(sum((V(F(adjF,1),:)-V(F(adjF,2),:)).^2,2));
         l1 = sqrt(sum((V(F(adjF,2),:)-V(F(adjF,3),:)).^2,2));
         l2 = sqrt(sum((V(F(adjF,3),:)-V(F(adjF,1),:)).^2,2));
@@ -170,7 +170,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
             continue;
         end
 
-        % CHECK: adj face normals flip
+        % CHECK: adj face normals flip (Appendix C)
         dotProd = sum(FN_new .* FN_prev,2);
         if any(dotProd < dotn_threshold) 
             fprintf('normal flipped\n');
@@ -181,7 +181,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
             continue;
         end
 
-        % CHECK: UN face normals flip
+        % CHECK: UN face normals flip (Appendix C)
         UV12 = UV(FUV(:,1),:)-UV(FUV(:,2),:);
         UV13 = UV(FUV(:,1),:)-UV(FUV(:,3),:);
         FNUV_new = UV12(:,1) .* UV13(:,2) - UV12(:,2) .* UV13(:,1);
@@ -198,7 +198,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
             continue;
         end
         
-        % CHECK: check lscm self folding (after collapse)
+        % CHECK: check lscm self folding (after collapse) (Appendix C)
         tmpF = FUV;
         tmpF(delFUV,:) = [];
         angAll = internalangles(UV,tmpF);
@@ -213,7 +213,7 @@ function  [V,F,decInfo] = SSP_decimation(V,F,tarV, ...
             continue;
         end
         
-        % CHECK: UV triangle quality
+        % CHECK: UV triangle quality (Appendix C)
         l0 = sqrt(sum((UV(FUV(:,1),:)-UV(FUV(:,2),:)).^2,2));
         l1 = sqrt(sum((UV(FUV(:,2),:)-UV(FUV(:,3),:)).^2,2));
         l2 = sqrt(sum((UV(FUV(:,3),:)-UV(FUV(:,1),:)).^2,2));

@@ -50,7 +50,7 @@ def main():
         trainErr = 0.0
         for mIdx in range(S.nM):
             # forward pass
-            x = S.getTrainData(mIdx, params)
+            x = S.getInputData(mIdx)
             outputs = net(x,mIdx, S.hfList, S.poolMats, S.dofs)
             
             # target mesh
@@ -75,7 +75,7 @@ def main():
         # loop over validation shapes 
         validErr = 0.0
         for mIdx in range(T.nM):
-            x = T.getTrainData(mIdx, params)
+            x = T.getInputData(mIdx)
             outputs = net(x,mIdx,T.hfList,T.poolMats,T.dofs)
             
             # target mesh
@@ -105,7 +105,7 @@ def main():
 
     # write output shapes (validation set)
     mIdx = 0
-    x = T.getTrainData(mIdx, params)
+    x = T.getInputData(mIdx)
     outputs = net(x, mIdx,T.hfList,T.poolMats,T.dofs) 
 
     # write unrotated outputs
@@ -118,7 +118,7 @@ def main():
 
     # write rotated output shapes (validation set)
     mIdx = 0
-    x = T.getTrainData(mIdx, params)
+    x = T.getInputData(mIdx)
     outputs = net(x, mIdx,T.hfList,T.poolMats,T.dofs)
 
     dV = torch.rand(1, 3).to(params['device'])
