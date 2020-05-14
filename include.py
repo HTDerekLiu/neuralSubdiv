@@ -33,11 +33,11 @@ class Mesh:
         Inputs:
             V: nV-3 vertex list
             F: nF-3 face list
-            hfList: nHF-5 ordered vertex index of all half flaps 
+            hfList: nHF-4 ordered vertex index of all half flaps 
             
             Notes: 
             each half flap order looks like (see paper for the color scheme)
-            [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+            [v_blue, v_red, v_purple, v_yellow]
         """
         self.V = V
         self.F = F
@@ -379,13 +379,13 @@ def computeFlapList(V, F, numSubd=2):
         rIdx = rIdx[rIdx >= nV]
         assert ((val == 0.5).all())
 
-        rIdx, idx = torch.sort(rIdx + nV)
+        rIdx, idx = torch.sort(rIdx)
         cIdx = cIdx[idx]
         rIdx = rIdx[::2]  
         cIdx = cIdx.view(-1, 2)
         # Note: Vodd = (V[cIdx[:,0],:] + V[cIdx[:,1],:]) / 2.0
 
-        flapIdx = torch.zeros(len(rIdx), 5).long()
+        flapIdx = torch.zeros(len(rIdx), 4).long()
         for kk in range(len(rIdx)):
             vi = cIdx[kk, 0]
             vj = cIdx[kk, 1]
@@ -416,24 +416,24 @@ def computeFlapList(V, F, numSubd=2):
             assert (f_sec[2] == vj)
 
             # assemble flapIdx as
-            # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
-            flapIdx[kk, :] = torch.tensor([vi, vj, f_first[2], f_sec[1], rIdx[kk]])
+            # [v_blue, v_red, v_purple, v_yellow]
+            flapIdx[kk, :] = torch.tensor([vi, vj, f_first[2], f_sec[1]])
 
         # turn flap indices into half flap indices
         # note:
         # flapIdx =
-        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
+        # [v_blue, v_red, v_purple, v_yellow]
         #    |
         #    V
         # halfFlapIdx = 
-        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
-        # [v_red, v_blue, v_yellow, v_purple, v_blue_at_next_level]
+        # [v_blue, v_red, v_purple, v_yellow]
+        # [v_red, v_blue, v_yellow, v_purple]
         #    |
         #    V
-        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level]
-        # [v_blue, v_red, v_purple, v_yellow, v_blue_at_next_level] (different orientation)
-        halfFlapIdx = flapIdx[:, [0, 1, 2, 3, 4, 1, 0, 3, 2, 4]]
-        halfFlapIdx = halfFlapIdx.reshape(-1, 5)
+        # [v_blue, v_red, v_purple, v_yellow]
+        # [v_blue, v_red, v_purple, v_yellow] (different orientation)
+        halfFlapIdx = flapIdx[:, [0, 1, 2, 3, 1, 0, 3, 2]]
+        halfFlapIdx = halfFlapIdx.reshape(-1, 4)
 
         FList.append(F)
         halfFlapList.append(halfFlapIdx)
