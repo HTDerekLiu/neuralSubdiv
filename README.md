@@ -1,6 +1,6 @@
 ## Neural Subdivison
  
-[Neural subdivision](https://www.dgp.toronto.edu/projects/neural-subdivision/) subdivides a triangle mesh using neural networks. This is a prototype implementation in Python 3.7  with PyTorch 1.3.1 and MATLAB. The Python code only requires standard dependencies (e.g., numpy), and the MATLAB code depends on [gptoolbox](https://github.com/alecjacobson/gptoolbox).
+[Neural subdivision](https://www.dgp.toronto.edu/projects/neural-subdivision/) subdivides a triangle mesh using neural networks. This is a prototype implementation in Python 3.7  with PyTorch 1.3.1 and MATLAB. The Python code requires standard dependencies (e.g., numpy), and the MATLAB code depends on [gptoolbox](https://github.com/alecjacobson/gptoolbox).
 
 For a quick demo, please use the pre-trained model and test on new shapes. To test the pre-tranied model please run `python test.py /path/to/model/folder/ /path/to/test.obj`. For instance, you can run
 ```
