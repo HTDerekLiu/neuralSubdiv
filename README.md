@@ -1,6 +1,6 @@
 ## Neural Subdivison
  
-The code base only requires standard python dependencies (e.g., numpy). Our code was implemented on python 3.7 with PyTorch 1.3.1. 
+[Neural subdivision](https://www.dgp.toronto.edu/projects/neural-subdivision/) subdivides a triangle mesh using neural networks. This is a prototype implementation in Python 3.7  with PyTorch 1.3.1 and MATLAB. The Python code only requires standard dependencies (e.g., numpy), and the MATLAB code depends on [gptoolbox](https://github.com/alecjacobson/gptoolbox).
 
 For a quick demo, please use the pre-trained model and test on new shapes. To test the pre-tranied model please run `python test.py /path/to/model/folder/ /path/to/test.obj`. For instance, you can run
 ```
@@ -14,3 +14,5 @@ Once you have the dataset, please run `python gendataPKL.py` to preprocess the m
 The next step is to use `python writeHyperparam.py` to create a folder that contains the parameters of the model (see `writeHyperparam.py` for more detail). In our example code, running `python writeHyperparam.py` will create a folder named `./jobs/net_cartoon_elephant/` which contains the model parameters.
 
 Then you can run `python train.py /path/to/model/folder/` to train the model. For instance, with the default folder generated with the above script, you can simply run `python train.py ./jobs/net_cartoon_elephant/` to train the model. After training, you can use the quick demo code `test.py` to test the model by running `python test.py /path/to/model/folder/ /path/to/testMesh.obj`.
+
+If any questions, please contact Hsueh-Ti Derek Liu (hsuehtil@cs.toronto.edu). 
