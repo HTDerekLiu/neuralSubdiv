@@ -1,8 +1,8 @@
 ## Neural Subdivison
  
-The code base only requires standard python dependencies (e.g., numpy). Our code was implemented on python 3.7 with PyTorch 1.3.1. Although not tested on the newer version of PyTorch, welcome to give it a try and let us know if any issues.
+The code base only requires standard python dependencies (e.g., numpy). Our code was implemented on python 3.7 with PyTorch 1.3.1. 
 
-For a quick demo, you could use the pre-trained model and test on new shapes. To test the pre-tranied model please run `python test.py /path/to/model/folder/ /path/to/test.obj`. For instance, you can run
+For a quick demo, please use the pre-trained model and test on new shapes. To test the pre-tranied model please run `python test.py /path/to/model/folder/ /path/to/test.obj`. For instance, you can run
 ```
 python test.py ./jobs/net_cartoon_elephant/ ./data_meshes/objs/bunny.obj
 ```
