@@ -26,7 +26,7 @@ def main():
 
     # load validation set
     meshPath = [sys.argv[2]]
-    T = TestMeshes(meshPath, numSubd)
+    T = TestMeshes(meshPath, params['numSubd'])
     T.computeParameters()
     if not torch.cuda.is_available():
         params['device'] = 'cpu'
