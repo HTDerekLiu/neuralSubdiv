@@ -15,12 +15,12 @@ NETPARAMS = 'netparams.dat'
 #   (we include a failure case in the data: the ear of the horse.obj)
 
 def main():
-    numSubd = 2
 
     # load hyper parameters
     folder = sys.argv[1]
     with open(folder + 'hyperparameters.json', 'r') as f:
         params = json.load(f)
+    params['numSubd'] = 2 # number of subdivision levels at test time
 
     print(os.path.basename(sys.argv[2]))
 
