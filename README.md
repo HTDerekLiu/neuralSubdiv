@@ -7,7 +7,7 @@ For a quick demo, please use the pre-trained model and test on new shapes. To te
 python test.py ./jobs/net_cartoon_elephant/ ./data_meshes/objs/bunny.obj
 ```
 
-If you would like to re-train a model, please first generate a dataset in the form of, for instance, `./data_meshes/cartoon_elephant_200/`. This could be done by running the MATLAB script `genTrainData_slow.m`.
+If you would like to re-train a model, please first generate a dataset in the form of, for instance, `./data_meshes/cartoon_elephant_200/`. This could be done by running the MATLAB script `genTrainData_slow.m` (a faster C++ version for generating training data can be found [here](https://github.com/HTDerekLiu/surface_multigrid_code/tree/main/09_random_subdiv_remesh)).
 
 Once you have the dataset, please run `python gendataPKL.py` to preprocess the meshes into a `.pkl` file, where you need to specify the folder that contains the mesh (please refer to `gendataPKL.py` for more detail).
 
